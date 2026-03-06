@@ -1,0 +1,17 @@
+{
+  "name": "bullet_backend",
+  "version": "1.0.0",
+  "description": "WebRTC Flutter backend",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "mongodb": "^7.1.0"
+  }
+}
