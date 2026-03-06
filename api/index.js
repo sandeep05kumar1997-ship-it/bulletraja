@@ -30,6 +30,14 @@ async function connectDB() {
   return db;
 }
 
+// TEMPORARY - DELETE AFTER USE
+app.delete("/api/nuke", async (req, res) => {
+  const database = await connectDB();
+  await database.collection("users").deleteMany({});
+  await database.collection("calls").deleteMany({});
+  res.json({ success: true, message: "All data erased" });
+});
+
 // USERS
 app.post("/api/users", async (req, res) => {
   try {
