@@ -62,6 +62,19 @@ app.post("/api/users", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// GET /api/calls — list all calls (admin)
+app.get("/api/calls", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const calls = database.collection("calls");
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    const data = await calls.find(filter).sort({ createdAt: -1 }).limit(50).toArray();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 app.get("/api/users", async (req, res) => {
   try {
