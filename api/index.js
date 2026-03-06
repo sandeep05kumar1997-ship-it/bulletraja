@@ -87,6 +87,23 @@ app.get("/api/users", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// Add this to your existing index.js
+
+// Store admin FCM token
+app.post("/api/admin/token", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { fcmToken } = req.body;
+    await database.collection("admin").updateOne(
+      { type: "admin" },
+      { $set: { fcmToken, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // START CALL
 app.post("/api/call/start", async (req, res) => {
