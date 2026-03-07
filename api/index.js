@@ -1,43 +1,44 @@
-const express = require("express");
-const { MongoClient } = require("mongodb");
-const cors = require("cors");
+import express from "express"
+import cors from "cors"
+import { MongoClient } from "mongodb"
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const app = express()
 
-const uri = process.env.MONGODB_URI;
+app.use(cors())
+app.use(express.json())
 
-let cachedClient = global.mongoClient;
-let cachedDb = global.mongoDb;
+const uri = process.env.MONGODB_URI
+
+let cachedClient = global.mongoClient
+let cachedDb = global.mongoDb
 
 async function connectDB() {
-  if (cachedClient && cachedDb) return cachedDb;
+  if (cachedClient && cachedDb) return cachedDb
 
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db("bulletraja");
+  const client = new MongoClient(uri)
+  await client.connect()
+  const db = client.db("bulletraja")
 
-  global.mongoClient = client;
-  global.mongoDb = db;
+  global.mongoClient = client
+  global.mongoDb = db
 
-  cachedClient = client;
-  cachedDb = db;
+  cachedClient = client
+  cachedDb = db
 
-  return db;
+  return db
 }
 
 app.get("/", async (req, res) => {
-  res.json({ status: "BulletRaja API running" });
-});
+  res.json({ status: "BulletRaja API running" })
+})
 
 app.post("/api/users", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId, name, role } = req.body;
+    const db = await connectDB()
+    const { deviceId, name, role } = req.body
 
     if (!deviceId || !name) {
-      return res.status(400).json({ success: false });
+      return res.status(400).json({ success: false })
     }
 
     await db.collection("users").updateOne(
@@ -53,77 +54,77 @@ app.post("/api/users", async (req, res) => {
         }
       },
       { upsert: true }
-    );
+    )
 
-    res.json({ success: true });
+    res.json({ success: true })
 
-  } catch (e) {
-    res.status(500).json({ success: false });
+  } catch {
+    res.status(500).json({ success: false })
   }
-});
+})
 
 app.get("/api/users", async (req, res) => {
   try {
-    const db = await connectDB();
+    const db = await connectDB()
 
     const users = await db
       .collection("users")
       .find({})
       .sort({ lastSeen: -1 })
-      .toArray();
+      .toArray()
 
-    res.json(users);
+    res.json(users)
 
-  } catch (e) {
-    res.status(500).json({ error: true });
+  } catch {
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.patch("/api/users/heartbeat", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId } = req.body;
+    const db = await connectDB()
+    const { deviceId } = req.body
 
     await db.collection("users").updateOne(
       { deviceId },
       { $set: { isOnline: true, lastSeen: new Date() } }
-    );
+    )
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.patch("/api/users/offline", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId } = req.body;
+    const db = await connectDB()
+    const { deviceId } = req.body
 
     await db.collection("users").updateOne(
       { deviceId },
       { $set: { isOnline: false, lastSeen: new Date() } }
-    );
+    )
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.post("/api/calllogs", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId, logs } = req.body;
+    const db = await connectDB()
+    const { deviceId, logs } = req.body
 
     if (!deviceId || !Array.isArray(logs)) {
-      return res.status(400).json({ success: false });
+      return res.status(400).json({ success: false })
     }
 
     if (logs.length === 0) {
-      return res.json({ success: true });
+      return res.json({ success: true })
     }
 
     const ops = logs.map(log => ({
@@ -132,49 +133,49 @@ app.post("/api/calllogs", async (req, res) => {
         update: { $set: { deviceId, ...log, syncedAt: new Date() } },
         upsert: true
       }
-    }));
+    }))
 
-    await db.collection("calllogs").bulkWrite(ops);
+    await db.collection("calllogs").bulkWrite(ops)
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch {
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false })
   }
-});
+})
 
 app.get("/api/calllogs/:deviceId", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId } = req.params;
+    const db = await connectDB()
+    const { deviceId } = req.params
 
     const logs = await db
       .collection("calllogs")
       .find({ deviceId })
       .sort({ timestamp: -1 })
       .limit(200)
-      .toArray();
+      .toArray()
 
-    res.json(logs);
+    res.json(logs)
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.post("/api/call/incoming", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId, phoneNumber, callerName, timestamp } = req.body;
+    const db = await connectDB()
+    const { deviceId, phoneNumber, callerName, timestamp } = req.body
 
     if (!deviceId) {
-      return res.status(400).json({ error: true });
+      return res.status(400).json({ error: true })
     }
 
     await db.collection("incomingcalls").deleteMany({
       deviceId,
       status: "ringing"
-    });
+    })
 
     await db.collection("incomingcalls").insertOne({
       deviceId,
@@ -183,35 +184,35 @@ app.post("/api/call/incoming", async (req, res) => {
       status: "ringing",
       timestamp: timestamp ? new Date(timestamp) : new Date(),
       createdAt: new Date()
-    });
+    })
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.post("/api/call/ended", async (req, res) => {
   try {
-    const db = await connectDB();
-    const { deviceId } = req.body;
+    const db = await connectDB()
+    const { deviceId } = req.body
 
     await db.collection("incomingcalls").updateMany(
       { deviceId, status: "ringing" },
       { $set: { status: "ended", endedAt: new Date() } }
-    );
+    )
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.get("/api/call/incoming/active", async (req, res) => {
   try {
-    const db = await connectDB();
+    const db = await connectDB()
 
     await db.collection("incomingcalls").updateMany(
       {
@@ -219,38 +220,38 @@ app.get("/api/call/incoming/active", async (req, res) => {
         createdAt: { $lt: new Date(Date.now() - 60000) }
       },
       { $set: { status: "ended" } }
-    );
+    )
 
     const calls = await db
       .collection("incomingcalls")
       .find({ status: "ringing" })
       .sort({ createdAt: -1 })
-      .toArray();
+      .toArray()
 
-    res.json(calls);
+    res.json(calls)
 
   } catch {
-    res.status(500).json({ error: true });
+    res.status(500).json({ error: true })
   }
-});
+})
 
 app.get("/api/debug", async (req, res) => {
   try {
-    const db = await connectDB();
+    const db = await connectDB()
 
-    const users = await db.collection("users").find({}).toArray();
-    const logs = await db.collection("calllogs").countDocuments();
-    const calls = await db.collection("incomingcalls").find({}).toArray();
+    const users = await db.collection("users").find({}).toArray()
+    const logs = await db.collection("calllogs").countDocuments()
+    const calls = await db.collection("incomingcalls").find({}).toArray()
 
     res.json({
       users,
       callLogCount: logs,
       incomingCalls: calls
-    });
+    })
 
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message })
   }
-});
+})
 
-module.exports = app;
+export default app
