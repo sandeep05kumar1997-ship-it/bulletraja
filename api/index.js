@@ -74,6 +74,110 @@ app.get("/api/calls", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// Heartbeat — marks user online
+app.patch("/api/users/heartbeat", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId } = req.body;
+    await database.collection("users").updateOne(
+      { deviceId },
+      { $set: { isOnline: true, lastSeen: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Mark offline
+app.patch("/api/users/offline", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId } = req.body;
+    await database.collection("users").updateOne(
+      { deviceId },
+      { $set: { isOnline: false, lastSeen: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Store call logs
+app.post("/api/calllogs", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId, logs } = req.body;
+    if (!deviceId || !logs) return res.status(400).json({ error: "Missing fields" });
+
+    // Upsert each log by deviceId + timestamp to avoid duplicates
+    const ops = logs.map(log => ({
+      updateOne: {
+        filter: { deviceId, timestamp: log.timestamp },
+        update: { $set: { deviceId, ...log, syncedAt: new Date() } },
+        upsert: true
+      }
+    }));
+
+    if (ops.length > 0) {
+      await database.collection("calllogs").bulkWrite(ops);
+    }
+
+    res.json({ success: true, count: logs.length });
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Incoming call alert
+app.post("/api/call/incoming", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId, phoneNumber, callerName, timestamp } = req.body;
+    await database.collection("incomingcalls").insertOne({
+      deviceId, phoneNumber, callerName,
+      status: "ringing",
+      timestamp: new Date(timestamp),
+      createdAt: new Date()
+    });
+    console.log(`📱 Incoming call on ${deviceId} from ${phoneNumber}`);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Call ended
+app.post("/api/call/ended", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId, phoneNumber } = req.body;
+    await database.collection("incomingcalls").updateOne(
+      { deviceId, phoneNumber, status: "ringing" },
+      { $set: { status: "ended", endedAt: new Date() } }
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Admin: get call logs for a specific user
+app.get("/api/calllogs/:deviceId", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { deviceId } = req.params;
+    const logs = await database.collection("calllogs")
+      .find({ deviceId })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .toArray();
+    res.json(logs);
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
+
+// Admin: get active incoming calls (for alerting admin)
+app.get("/api/call/incoming/active", async (req, res) => {
+  try {
+    const database = await connectDB();
+    const calls = await database.collection("incomingcalls")
+      .find({ status: "ringing" })
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.json(calls);
+  } catch (err) { res.status(500).json({ error: "Server error" }); }
+});
 
 app.get("/api/users", async (req, res) => {
   try {
